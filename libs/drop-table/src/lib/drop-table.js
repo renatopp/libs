@@ -1,47 +1,75 @@
+const { resolve } = require('./resolve')
+
 class DropTable {
-  constructor() {
+  constructor(items=[], options={}) {
     this._table = []
     this._totalWeight = 0
+
+    if (!Array.isArray(items)) {
+      options = items
+      items = []
+    }
+
+    this.options = options
+    items.forEach(x => this.add(x[0], x[1]))
   }
 
-  add(weight, data) {
-    this._table.push({ weight, data })
+  add(weight, item) {
+    this._table.push({ weight, item })
     this._totalWeight += weight
   }
 
-  drop(count=1, options) {
-    if (count > 1) return this.__drop(count)
-    return this.__dropOne()
-  }
+  drop(options = {}) {
+    const c =  (options.count ?? this.options?.count)
+    const asList = !!c
+    const count = c ?? 1
+    const noRepeat = (options.noRepeat ?? this.options?.noRepeat) || false
+    const noResolve = (options.noResolve ?? this.options?.noResolve) ?? false
 
-  __drop(count) {
+    let table = noRepeat ? Array.from(this._table) : this._table
+    let totalWeight = this._totalWeight
+
     const result = []
     for (let i=0; i<count; i++) {
-      result.push(this.__dropOne())
+      const idx = this._pick(table, totalWeight)
+      const entry = table[idx]
+      
+      result.push(noResolve? entry?.item : resolve(entry?.item))
+
+      if (noRepeat) {
+        table.splice(idx, 1)
+        totalWeight -= entry.weight ?? 0
+        if (table.length <= 0) break
+      }
     }
-    return result
+
+    return asList ? result : result[0]
   }
 
-  __dropOne(table) {
-    const ticket = Math.random() * this._totalWeight;
-    let sum = 0
-    for (let i=0; i<this._table.length; i++) {
-      const element = this._table[i]
-      sum += element.weight
-      if (ticket < sum) return element.data
-    }
+  all() {
+    return this._table.map(entry => {
+      return resolve(entry.item)
+    })
   }
 
-  __dropWithReplacement(count) {
-    const tempTable = Array.from(this.table)
-    tempTable
+  map(fn) {
+    return this._table.map(entry => {
+      return fn(entry.item)
+    })
+  }
 
-    const ticket = Math.random() * this._totalWeight;
+  $_drop() {
+    return this.drop()
+  }
+
+  _pick(table, totalWeight) {
+    const ticket = Math.random() * totalWeight;
+    
     let sum = 0
-    for (let i=0; i<this._table.length; i++) {
-      const element = this._table[i]
-      sum += element.weight
-      if (ticket < sum) return element.data
+    for (let i=0; i<table.length; i++) {
+      const entry = table[i]
+      sum += entry.weight
+      if (ticket < sum) return i
     }
   }
 }
